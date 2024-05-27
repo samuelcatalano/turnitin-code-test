@@ -6,6 +6,7 @@ import integrations.turnitin.com.membersearcher.model.User;
 import integrations.turnitin.com.membersearcher.model.UserList;
 import org.springframework.stereotype.Service;
 
+import java.util.Collections;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.logging.Logger;
@@ -54,7 +55,7 @@ public class MembershipService {
       // Log the exception
       log.warning("Error fetching memberships or users: " + ex.getMessage());
       // Handle the error scenario
-      return new MembershipList(); // Returning an empty MembershipList at this moment
+      return new MembershipList().setMemberships(Collections.emptyList()); // Returning an empty MembershipList at this moment
     });
   }
 }

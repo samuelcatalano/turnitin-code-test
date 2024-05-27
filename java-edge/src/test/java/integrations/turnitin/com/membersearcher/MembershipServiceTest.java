@@ -20,28 +20,27 @@ import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
-@MockitoSettings(strictness = Strictness.LENIENT)
+@MockitoSettings(strictness = Strictness.LENIENT) // In this mode, Mockito does not check whether a mock's methods are called with the correct arguments
 class MembershipServiceTest {
 
 	@InjectMocks
 	private MembershipService membershipService;
-
 	@Mock
 	private MembershipBackendClient membershipBackendClient;
 
-	@Mock
-	private ObjectMapper objectMapper;
-
+  private MembershipList members;
   private User userOne;
-
 	private User userTwo;
 
+	/**
+	 * Initializes test objects and mocks.
+	 */
 	@BeforeEach
 	public void init() {
-    final MembershipList members = new MembershipList()
+    members = new MembershipList()
         .setMemberships(List.of(
             new Membership()
                 .setId("a")
@@ -65,6 +64,7 @@ class MembershipServiceTest {
 		final CompletableFuture<UserList> usersFuture = new CompletableFuture<>();
 		usersFuture.complete(new UserList().setUsers(List.of(userOne, userTwo)));
 
+		// Configure mocks
 		when(membershipBackendClient.fetchMemberships()).thenReturn(CompletableFuture.completedFuture(members));
 		when(membershipBackendClient.fetchUsers()).thenReturn(usersFuture);
 
@@ -73,10 +73,62 @@ class MembershipServiceTest {
 		when(membershipBackendClient.fetchUser("2")).thenReturn(CompletableFuture.completedFuture(userTwo));
 	}
 
+	/**
+	 * Test method for {@link MembershipService#fetchAllMembershipsWithUsers()}.
+	 * Verifies that the method returns a {@link MembershipList} with users fetched.
+	 *
+	 * @throws Exception if an error occurs during the test
+	 */
 	@Test
 	void testFetchAllMemberships() throws Exception {
 		final MembershipList members = membershipService.fetchAllMembershipsWithUsers().get();
 		assertThat(members.getMemberships().get(0).getUser()).isEqualTo(userOne);
 		assertThat(members.getMemberships().get(1).getUser()).isEqualTo(userTwo);
+	}
+
+	/**
+	 * Test method for {@link MembershipService#fetchAllMembershipsWithUsers()}.
+	 * Verifies that the method returns an empty {@link MembershipList} when fetching memberships fails.
+	 */
+	@Test
+	void testFetchMembershipsException() {
+		when(membershipBackendClient.fetchMemberships()).thenReturn(
+				CompletableFuture.failedFuture(new RuntimeException("Memberships fetch failed"))
+		);
+
+		final MembershipList members = membershipService.fetchAllMembershipsWithUsers().join();
+		assertThat(members.getMemberships()).isEmpty();
+	}
+
+	/**
+	 * Test method for {@link MembershipService#fetchAllMembershipsWithUsers()}.
+	 * Verifies that the method returns a {@link MembershipList} with null users when fetching users fails.
+	 */
+	@Test
+	void testFetchUsersException() {
+		when(membershipBackendClient.fetchUsers()).thenReturn(
+				CompletableFuture.failedFuture(new RuntimeException("Users fetch failed"))
+		);
+
+		assertThat(members).isNotNull();
+		assertThat(members.getMemberships()).isNotNull();
+		assertThat(members.getMemberships().get(0).getUser()).isNull();
+		assertThat(members.getMemberships().get(1).getUser()).isNull();
+	}
+
+	/**
+	 * Test method for {@link MembershipService#fetchAllMembershipsWithUsers()}.
+	 * Verifies that the method returns a {@link MembershipList} with null membership list is empty.
+	 */
+	@Test
+	void testEmptyUsersList() throws Exception {
+		final UserList emptyUsers = new UserList().setUsers(List.of());
+
+		when(membershipBackendClient.fetchUsers()).thenReturn(CompletableFuture.completedFuture(emptyUsers));
+
+		final MembershipList members = membershipService.fetchAllMembershipsWithUsers().get();
+		assertThat(members.getMemberships()).isNotEmpty();
+		assertThat(members.getMemberships().get(0).getUser()).isNull();
+		assertThat(members.getMemberships().get(1).getUser()).isNull();
 	}
 }

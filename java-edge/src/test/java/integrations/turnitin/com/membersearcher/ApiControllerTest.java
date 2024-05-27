@@ -16,6 +16,7 @@ import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
@@ -34,8 +35,12 @@ class ApiControllerTest {
   @MockBean
   private MembershipService membershipService;
 
+  /**
+   * Tests the "/api/course/members" endpoint when it returns a list of memberships with users.
+   * @throws Exception if an error occurs during the test execution
+   */
   @Test
-  void TestMembershipsEndpointReturnsMemberships() throws Exception {
+  void testMembershipsEndpointReturnsMemberships() throws Exception {
     final MembershipList members = new MembershipList()
         .setMemberships(List.of(
             new Membership()
@@ -63,5 +68,45 @@ class ApiControllerTest {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.memberships").isNotEmpty())
         .andExpect(jsonPath("$.memberships[0].user.name").value("test one"));
+  }
+
+  /**
+   * Tests the "/api/course/members" endpoint when it returns an empty list of memberships.
+   * @throws Exception if an error occurs during the test execution
+   */
+  @Test
+  void testMembershipsEndpointReturnsEmptyList() throws Exception {
+    final MembershipList emptyMembers = new MembershipList().setMemberships(Collections.emptyList());
+    when(membershipService.fetchAllMembershipsWithUsers()).thenReturn(CompletableFuture.completedFuture(emptyMembers));
+
+    final MockHttpServletRequestBuilder request = MockMvcRequestBuilders.get("/api/course/members");
+    final MvcResult result = mvc.perform(request).andReturn();
+    mvc.perform(asyncDispatch(result))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.memberships").isArray())
+        .andExpect(jsonPath("$.memberships").isEmpty());
+  }
+
+  /**
+   * Tests the "/api/course/members" endpoint when it returns a list of memberships without user information.
+   * @throws Exception if an error occurs during the test execution
+   */
+  @Test
+  void testMembershipsEndpointReturnsMembershipsWithoutUsers() throws Exception {
+    final MembershipList membersWithoutUsers = new MembershipList()
+        .setMemberships(List.of(
+            new Membership().setId("a").setRole("instructor").setUserId("1"),
+            new Membership().setId("b").setRole("student").setUserId("2")
+        ));
+    when(membershipService.fetchAllMembershipsWithUsers()).thenReturn(CompletableFuture.completedFuture(membersWithoutUsers));
+
+    final MockHttpServletRequestBuilder request = MockMvcRequestBuilders.get("/api/course/members");
+    final MvcResult result = mvc.perform(request).andReturn();
+    mvc.perform(asyncDispatch(result))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.memberships").isArray())
+        .andExpect(jsonPath("$.memberships").isNotEmpty())
+        .andExpect(jsonPath("$.memberships[0].user").doesNotExist())
+        .andExpect(jsonPath("$.memberships[1].user").doesNotExist());
   }
 }
